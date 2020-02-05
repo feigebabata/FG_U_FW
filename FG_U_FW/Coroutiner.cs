@@ -88,6 +88,13 @@ namespace FG_U_FW
             }
             _callback?.Invoke();
         }
+
+        public static void Clear()
+        {
+            tryInit();
+            mb.StopAllCoroutines();
+            mb=null;
+        }
     }
 
     public static class CoroutineExpand
