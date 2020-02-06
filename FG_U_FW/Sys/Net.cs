@@ -235,7 +235,7 @@ namespace FG_U_FW
                 }
                 catch (System.Exception _e)
                 {
-                    error(client,_e.Message);
+                    onError(client,_e.Message);
                     return;
                 }
                 m_clients.Add(client);
@@ -245,9 +245,14 @@ namespace FG_U_FW
                 reveive(client);
             }
 
-            void error(Socket _client,string _msg)
+            protected virtual void onError(Socket _client,string _msg)
             {
                 Debug.LogError(_msg);
+                if(_client!=null)
+                {
+                    _client.Close();
+                    m_clients.Remove(_client);
+                }
             }
 
             void reveive(Socket _client)
@@ -269,7 +274,7 @@ namespace FG_U_FW
                 }
                 catch (System.Exception _e)
                 {
-                    error(client,_e.Message);
+                    onError(client,_e.Message);
                     return;
                 }
                 if(size>0)
@@ -281,6 +286,34 @@ namespace FG_U_FW
                 }
                 reveive(client);
             }
+
+            public void Send(Socket _client,byte[] _data,int _offset,int _length)
+            {
+                _client.BeginSend(_data,_offset,_length,SocketFlags.None,sendResult,_client);
+            }
+
+            void sendResult(IAsyncResult _ar)
+            {
+                Socket client = _ar.AsyncState as Socket;
+                try
+                {
+                    client.EndSend(_ar);
+                }
+                catch (System.Exception _e)
+                {
+                    onError(client,_e.Message);
+                }
+            }
+
+            public void SendAll(byte[] _data,int _offset,int _length)
+            {
+                m_clients.ForEach((_client)=>
+                {
+                    Send(_client,_data,_offset,_length);
+                });
+            }
+
+            
 
             protected abstract void Decode(Socket _client);
             

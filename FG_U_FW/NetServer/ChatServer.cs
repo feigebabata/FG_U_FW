@@ -19,7 +19,8 @@ namespace FG_U_FW
             if(msgLength<=size)
             {
                 string msg = System.Text.Encoding.UTF8.GetString(buffer,2,buffer.Length-2);
-
+                byte[] sendData = new byte[msgLength];
+                Array.Copy(buffer,sendData,sendData.Length);
                 int newSize = size;
                 if(msgLength==size)
                 {
@@ -30,7 +31,8 @@ namespace FG_U_FW
                     newSize = size-msgLength;
                     Array.Copy(buffer,msgLength,buffer,0,newSize);
                 }
-                Debug.LogWarning(msg);
+                Debug.LogWarning("服务器接收:"+msg);
+                SendAll(sendData,0,sendData.Length);
             }
         }
 

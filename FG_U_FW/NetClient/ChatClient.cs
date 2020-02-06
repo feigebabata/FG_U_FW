@@ -25,7 +25,21 @@ namespace FG_U_FW
 
         protected override void Decode()
         {
-            m_ReceiveQueue.Enqueue(null);
+            ushort msgLength = BitConverter.ToUInt16(m_Buffer,0);
+            if(msgLength<=m_BufferSize)
+            {
+                string msg = System.Text.Encoding.UTF8.GetString(m_Buffer,2,m_Buffer.Length-2);
+
+                m_BufferSize -= msgLength;
+                if(m_BufferSize>0)
+                {
+                    Array.Copy(m_Buffer,msgLength,m_Buffer,0,m_BufferSize);
+                }
+                
+                // Debug.LogWarning("客户端接收:"+msg);
+
+                m_ReceiveQueue.Enqueue(msg);
+            }
         }
 
         protected override void OnError(string _msg)
@@ -44,7 +58,7 @@ namespace FG_U_FW
                     object data=null;
                     if(m_ReceiveQueue.TryDequeue(out data))
                     {
-
+                        Debug.LogWarning("客户端接收:"+data as string);
                     }
                 }
             }
