@@ -133,7 +133,7 @@ namespace FG_U_FW
                 }
                 catch (System.Exception _e)
                 {
-                    error(_e.Message);
+                    OnError(_e.Message);
                     ConnectResult(false);
                     return;
                 }
@@ -150,21 +150,25 @@ namespace FG_U_FW
 
             void receiveResult(IAsyncResult _ar)
             {
-                Socket client = _ar.AsyncState as Socket;
-                int size=0;
-                try
+                if(m_IsConnect)
                 {
-                    size = client.EndReceive(_ar);
-                }
-                catch (System.Exception _e) 
-                {
-                    error(_e.Message);
-                    return;
-                }
-                if(size>0)
-                {
-                    m_BufferSize+=size;
-                    Decode();
+                    Socket client = _ar.AsyncState as Socket;
+                    int size=0;
+                    try
+                    {
+                        size = client.EndReceive(_ar);
+                    }
+                    catch (System.Exception _e) 
+                    {
+                        OnError(_e.Message);
+                        return;
+                    }
+                    if(size>0)
+                    {
+                        m_BufferSize+=size;
+                        Decode();
+                    }
+                    receive();
                 }
             }
 
@@ -184,20 +188,19 @@ namespace FG_U_FW
                 }
                 catch (System.Exception _e)
                 {
-                    error(_e.Message);
+                    OnError(_e.Message);
                 }
             }
 
-            void error(string _msg)
+            protected virtual void OnError(string _msg)
             {
                 Close();
-                OnError(_msg);
             }
 
-            protected abstract void OnError(string _msg);
 
             public void Close()
             {
+                m_client?.Shutdown(SocketShutdown.Both);
                 m_client?.Close();
                 m_client=null;
                 m_BufferSize=0;
@@ -227,29 +230,32 @@ namespace FG_U_FW
 
             void acceptResult(IAsyncResult _ar)
             {
-                var listener = _ar.AsyncState as TcpListener;
-                Socket client = null;
-                try
+                if(m_listener!=null)
                 {
-                    client = listener.EndAcceptSocket(_ar);
+                    Socket client = null;
+                    try
+                    {
+                        client = m_listener.EndAcceptSocket(_ar);
+                    }
+                    catch (System.Exception _e)
+                    {
+                        OnError(client,_e.Message);
+                        return;
+                    }
+                    m_clients.Add(client);
+                    m_Buffers.TryAdd(client,new byte[Net.Config.BUFFER_MAX_SIZE]);
+                    m_BufferSizes.TryAdd(client,0);
+                    accept();
+                    reveive(client);
                 }
-                catch (System.Exception _e)
-                {
-                    onError(client,_e.Message);
-                    return;
-                }
-                m_clients.Add(client);
-                m_Buffers.TryAdd(client,new byte[Net.Config.BUFFER_MAX_SIZE]);
-                m_BufferSizes.TryAdd(client,0);
-                accept();
-                reveive(client);
             }
 
-            protected virtual void onError(Socket _client,string _msg)
+            protected virtual void OnError(Socket _client,string _msg)
             {
                 Debug.LogError(_msg);
                 if(_client!=null)
                 {
+                    _client.Shutdown(SocketShutdown.Both);
                     _client.Close();
                     m_clients.Remove(_client);
                 }
@@ -267,24 +273,27 @@ namespace FG_U_FW
             void receiveResult(IAsyncResult _ar)
             {
                 Socket client = _ar.AsyncState as Socket;
-                int size = 0;
-                try
+                if(client!=null && client.Connected)
                 {
-                    size = client.EndReceive(_ar);
+                    int size = 0;
+                    try
+                    {
+                        size = client.EndReceive(_ar);
+                    }
+                    catch (System.Exception _e)
+                    {
+                        OnError(client,_e.Message);
+                        return;
+                    }
+                    if(size>0)
+                    {
+                        int val = 0;
+                        m_BufferSizes.TryGetValue(client,out val);
+                        m_BufferSizes.TryUpdate(client,val+size,val);
+                        Decode(client);
+                    }
+                    reveive(client);
                 }
-                catch (System.Exception _e)
-                {
-                    onError(client,_e.Message);
-                    return;
-                }
-                if(size>0)
-                {
-                    int val = 0;
-                    m_BufferSizes.TryGetValue(client,out val);
-                    m_BufferSizes.TryUpdate(client,val+size,val);
-                    Decode(client);
-                }
-                reveive(client);
             }
 
             public void Send(Socket _client,byte[] _data,int _offset,int _length)
@@ -301,7 +310,7 @@ namespace FG_U_FW
                 }
                 catch (System.Exception _e)
                 {
-                    onError(client,_e.Message);
+                    OnError(client,_e.Message);
                 }
             }
 
@@ -319,13 +328,15 @@ namespace FG_U_FW
             
             public void Close()
             {
-                m_listener?.Stop();
-                
                 var ie = m_clients.GetEnumerator();
                 while(ie.MoveNext())
                 {
+                    ie.Current.Shutdown(SocketShutdown.Both);
                     ie.Current.Close();
                 }
+                m_listener?.Stop();
+                m_listener=null;
+                
 
                 m_clients.Clear();
                 m_Buffers.Clear();

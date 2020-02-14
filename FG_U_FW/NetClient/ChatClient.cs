@@ -49,7 +49,6 @@ namespace FG_U_FW
 
         IEnumerator WaitReceive()
         {
-            Debug.Log("111");
             while(m_IsConnect)
             {
                 yield return m_ReceiveQueue;
