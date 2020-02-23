@@ -3,12 +3,8 @@ using UnityEngine;
 
 namespace FG_U_FW
 {
-    public class Tex2DLoad : IAsyncLoad<Texture2D>,ISys
+    public class Tex2DLoad : OnlyAsyncWait<Texture2D>,ISys
     {
-        public void Cancel(string _uri, Action<Texture2D> _callback)
-        {
-        }
-
         public void Clear()
         {
         }
@@ -17,9 +13,14 @@ namespace FG_U_FW
         {
         }
 
-        public void Load(string _uri, Action<Texture2D> _callback)
+        protected override void addWait(string _url)
         {
-            Debug.LogFormat("tex2D.load {0} {1}",_uri,_callback);
+            Debug.LogFormat("[Tex2DLoad.addWait] {0}",_url);
+        }
+
+        protected override void removeWait(string _url)
+        {
+            Debug.LogFormat("[Tex2DLoad.removeWait] {0}",_url);
         }
     }
 }
