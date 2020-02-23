@@ -230,7 +230,7 @@ namespace FG_U_FW
 
             void acceptResult(IAsyncResult _ar)
             {
-                if(m_listener!=null)
+                if(m_listener!=null && m_listener.Server!=null)
                 {
                     Socket client = null;
                     try
