@@ -5,7 +5,7 @@ using System;
 
 namespace FG_U_FW
 {
-    public class Pool<K,T> where T:class
+    public class AssetPool<K,T> where T:class
     {
         public class Unit
         {
@@ -13,17 +13,18 @@ namespace FG_U_FW
             public K Key;
             public T Value;
         }
-        List<Unit> m_list = new List<Unit>();
+        List<Unit> m_list;
         int m_maxCount;
 
-        public Pool(Func<K,T> _create,int _maxCount)
+        public AssetPool(int _maxCount)
         {
             m_maxCount = _maxCount;
+            m_list = new List<Unit>(_maxCount);
         }
 
-        public void Clear(int _count)
+        public void Clear(int _count=0)
         {
-            if(_count>0 && _count<m_list.Count)
+            if(_count<m_list.Count)
             {
                 m_list.Sort((_u1,_u2)=>{return Mathf.CeilToInt(_u1.Weights-_u2.Weights);});
                 while(_count<m_list.Count)
@@ -49,6 +50,11 @@ namespace FG_U_FW
                 unit.Value = _t;
                 unit.Weights = 1;
                 m_list.Add(unit);
+
+                if(m_list.Count>m_maxCount)
+                {
+                    Clear(m_maxCount);
+                }
             }
         }
 
