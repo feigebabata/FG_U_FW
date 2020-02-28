@@ -41,14 +41,14 @@ namespace FG_U_FW
             if(unit!=null)
             {
                 unit.Value = _t;
-                unit.Weights = 1;
+                unit.Weights = Time.time;
             }
             else
             {
                 unit = new Unit();
                 unit.Key = _k;
                 unit.Value = _t;
-                unit.Weights = 1;
+                unit.Weights = Time.time;
                 m_list.Add(unit);
 
                 if(m_list.Count>m_maxCount)
@@ -63,7 +63,7 @@ namespace FG_U_FW
             var unit = m_list.Find((_u)=>{return _u.Key.Equals(_key);});
             if(unit!=null)
             {
-                unit.Weights+=1/unit.Weights;
+                unit.Weights=Time.time + 1/unit.Weights;
                 return unit.Value;
             }
             return null;

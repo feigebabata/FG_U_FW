@@ -5,11 +5,8 @@ namespace FG_U_FW
 {
     public class Tex2DLoad : OnlyAsyncWait<Texture2D>,ISys
     {
+        
         public void Clear()
-        {
-        }
-
-        public void Init()
         {
         }
 

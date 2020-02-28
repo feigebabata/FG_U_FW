@@ -34,10 +34,6 @@ namespace FG_U_FW
             m_serverTab.Clear();
         }
 
-        public void Init()
-        {
-        }
-
         public T Client<T>() where T:ClientBase
         {
             var type = typeof(T);

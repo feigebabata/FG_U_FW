@@ -5,13 +5,18 @@ namespace FG_U_FW
     {
         None,
         Create,
-        Create2Show,
+        // Create2Show,
         Show,
-        Show2Hide,
+        // Show2Focus,
+        Focus,
+        // Focus2UnFocus,
+        UnFocus,
+        // UnFocus2Focus,
+        // UnFocus2Hide,
         Hide,
-        Hide2Show,
-        Hide2Destory,
+        // Hide2UnFocus,
+        // Hide2Destory,
         Destroy,
-        Destroy2Create,
+        // Destroy2Create,
     }
 }

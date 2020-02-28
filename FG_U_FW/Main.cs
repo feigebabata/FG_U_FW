@@ -15,18 +15,28 @@ namespace FG_U_FW
             Camera.main.gameObject.AddComponent<FGBBT>();
         }
 
-        Hashtable m_sysTab = new Hashtable();
+        ConcurrentDictionary<Type,ISys> m_sysTab = new ConcurrentDictionary<Type, ISys>();
 
         public T Sys<T>() where T:class,ISys
         {
             var type = typeof(T);
-            if(!m_sysTab.Contains(type))
+            ISys sys = default;
+            if(!m_sysTab.ContainsKey(type))
             {
-                T sys = Activator.CreateInstance<T>();
-                sys.Init();
-                m_sysTab.Add(type,sys);
+                sys = Activator.CreateInstance<T>();
+                if(!m_sysTab.TryAdd(type,sys))
+                {
+                    Debug.LogError("[Main.Sys]添加失败");
+                }
             }
-            return m_sysTab[type] as T;
+            else
+            {
+                if(!m_sysTab.TryGetValue(type,out sys))
+                {
+                    Debug.LogError("[Main.Sys]获取失败");
+                }
+            }
+            return sys as T;
         }
 
         ConcurrentQueue<Action> m_childQueue = new ConcurrentQueue<Action>();

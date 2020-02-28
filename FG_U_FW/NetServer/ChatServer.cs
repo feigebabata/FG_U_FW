@@ -3,7 +3,7 @@ using System;
 using System.Net.Sockets;
 using UnityEngine;
 
-namespace FG_U_FW
+namespace FG_U_FW.NetServer
 {
     public class ChatServer : Net.ServerBase
     {
@@ -38,7 +38,7 @@ namespace FG_U_FW
 
         protected override void StartFinish(bool _succ)
         {
-            Main.I.Sys<Net>().Client<ChatClient>().Connect(Net.IP.ToString(),6666);
+            Main.I.Sys<Net>().Client<NetClient.ChatClient>().Connect(Net.IP.ToString(),6666);
         }
     }
 }

@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Concurrent;
 using UnityEngine;
 
-namespace FG_U_FW
+namespace FG_U_FW.NetClient
 {
     public class ChatClient : Net.ClientBase
     {

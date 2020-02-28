@@ -5,6 +5,8 @@ namespace FG_U_FW
     {
         void OnCreate();
         void OnShow(object _data);
+        void OnFocus();
+        void OnUnFocus();
         void OnHide();
         void OnDestroy();
     }

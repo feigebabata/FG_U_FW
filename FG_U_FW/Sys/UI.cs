@@ -82,13 +82,20 @@ namespace FG_U_FW
             }
         }
 
-        public void Open<T>(OpenMode _mode=OpenMode.Open,object _data=null) where T : UIBase
+        public void Open<T>(OpenMode _mode=OpenMode.Open,object _data=null,Action _finish=null) where T : UIBase
+        {
+            open<T>(_mode,_data,_finish).Start();
+        }
+
+        IEnumerator open<T>(OpenMode _mode=OpenMode.Open,object _data=null,Action _finish=null)
         {
             if(!m_panelParent)
             {
                 if(!GameObject.Find("UIRoot/Canvas/Panels"))
                 {
-                    GameObject uiRoot = loadPrefab("UIRoot");
+                    PrefabLoader loader = new PrefabLoader("UIRoot");
+                    yield return loader;
+                    GameObject uiRoot = loader.Prefab;
                     uiRoot.name="UIRoot";
                     uiRoot.transform.position=Vector3.zero;
                 }
@@ -104,8 +111,11 @@ namespace FG_U_FW
                     {
                         if(m_uiStack.Peek().GetType()!=newUIType)
                         {
+                            unfocus(m_uiStack.Peek());
                             hide(m_uiStack.Peek());
-                            create(newUIType,_data);
+                            yield return create(newUIType);
+                            show(m_uiStack.Peek(),_data);
+                            focus(m_uiStack.Peek());
                         }
                     }
                     break;
@@ -113,25 +123,29 @@ namespace FG_U_FW
                     {
                         if(m_uiStack.Peek().GetType()!=newUIType)
                         {
+                            unfocus(m_uiStack.Peek());
                             hide(m_uiStack.Peek());
                             UIBase ui = m_uiStack.Find((_ui)=>{return _ui.GetType()==newUIType;});
                             if(ui)
                             {
                                 m_uiStack.Remove(ui);
                                 m_uiStack.Push(ui);
-                                ui.m_State = CycleState.Hide2Show;
-                                show(ui,_data);
                             }
                             else
                             {
-                                create(newUIType,_data);
+                                yield return create(newUIType);
                             }
+                            show(ui,_data);
+                            focus(ui);
                         }
                     }
                     break;
                     case OpenMode.Overlay:
                     {
-                        create(newUIType,_data);
+                        unfocus(m_uiStack.Peek());
+                        yield return create(newUIType);
+                        show(m_uiStack.Peek(),_data);
+                        focus(m_uiStack.Peek());
                     }
                     break;
                     case OpenMode.Back:
@@ -140,18 +154,23 @@ namespace FG_U_FW
                         {
                             if(m_uiStack.Find((_ui)=>{return _ui.GetType()==newUIType;})==null)
                             {
+                                unfocus(m_uiStack.Peek());
                                 hide(m_uiStack.Peek());
-                                create(newUIType,_data);
+                                yield return create(newUIType);
+                                show(m_uiStack.Peek(),_data);
+                                focus(m_uiStack.Peek());
                             }
                             else
                             {
                                 while(m_uiStack.Peek().GetType()!=newUIType)
                                 {
+                                    unfocus(m_uiStack.Peek());
+                                    hide(m_uiStack.Peek());
                                     destroy(m_uiStack.Pop());
                                 }
                                 UIBase ui = m_uiStack.Peek();
-                                ui.m_State = CycleState.Hide2Show;
                                 show(ui,_data);
+                                focus(ui);
                             }
                         }
                     }
@@ -160,8 +179,31 @@ namespace FG_U_FW
             }
             else
             {
-                create(newUIType,_data);
+                yield return create(newUIType);
+                show(m_uiStack.Peek(),_data);
+                focus(m_uiStack.Peek());
             }
+            _finish?.Invoke();
+        }
+
+        void focus(UIBase _ui)
+        {
+            if(_ui.m_State == CycleState.Focus)
+            {
+                return;
+            }
+            _ui.m_State = CycleState.Focus;
+            _ui.OnFocus();
+        }
+
+        void unfocus(UIBase _ui)
+        {
+            if(_ui.m_State == CycleState.UnFocus)
+            {
+                return;
+            }
+            _ui.m_State = CycleState.UnFocus;
+            _ui.OnUnFocus();
         }
 
         /// <summary>
@@ -169,25 +211,22 @@ namespace FG_U_FW
         /// </summary>
         /// <param name="_uiType"></param>
         /// <param name="_data"></param>
-        void create(Type _uiType,object _data)
+        IEnumerator create(Type _uiType)
         {
             UIBase ui = m_uiPool.Pull(_uiType);
             if(ui==null)
             {
-                ui = loadUI(_uiType);
+                PrefabLoader loader = new PrefabLoader(_uiType.Name);
+                yield return loader;
+                loader.Prefab.transform.SetParent(m_panelParent,false);
+                ui = loader.Prefab.GetComponent<UIBase>();
                 ui.gameObject.name = _uiType.Name;
-                ui.m_State = CycleState.Create;
-            }
-            else
-            {
-                ui.m_State = CycleState.Destroy2Create;
             }
             ui.gameObject.SetActive(true);
             ui.transform.localPosition = Config.HidePos;
             m_uiStack.Push(ui);
             ui.OnCreate();
-            ui.m_State = CycleState.Create2Show;
-            show(ui,_data);
+            ui.m_State = CycleState.Create;
         }
 
         /// <summary>
@@ -200,7 +239,6 @@ namespace FG_U_FW
             {
                 return;
             }
-            _ui.m_State = CycleState.Show2Hide;
             _ui.OnHide();
             _ui.m_State = CycleState.Hide;
             _ui.transform.localPosition = Config.HidePos;
@@ -212,8 +250,6 @@ namespace FG_U_FW
         /// <param name="_ui"></param>
         void destroy(UIBase _ui)
         {
-            hide(_ui);
-            _ui.m_State = CycleState.Hide2Destory;
             _ui.OnDestroy();
             _ui.m_State = CycleState.Destroy;
             _ui.gameObject.SetActive(false);
@@ -221,22 +257,6 @@ namespace FG_U_FW
 
         }
 
-        UIBase loadUI(Type _uiType)
-        {        
-            return loadPrefab(_uiType.Name).GetComponent<UIBase>();
-        }
-
-        /// <summary>
-        /// 从ab文件中获取预制件的实例
-        /// </summary>
-        /// <param name="_name"></param>
-        /// <returns></returns>
-        GameObject loadPrefab(string _name)
-        {
-            GameObject go = null;
-            
-            return go;
-        }
 
         /// <summary>
         /// 显示界面 ui界面移至视图内
@@ -274,25 +294,29 @@ namespace FG_U_FW
             }
         }
 
-        public void Init()
+        class PrefabLoader : IEnumerator
         {
+            public object Current => null;
 
-        }
+            public GameObject Prefab;
 
-        public void Reset()
-        {
-            
-        }
+            public PrefabLoader(string _path)
+            {
 
-        public GameObject GetUIPrefab(string _name)
-        {
-            return loadPrefab(_name);
+            }
+
+            public bool MoveNext()
+            {
+                return Prefab;
+            }
+
+            public void Reset(){}
         }
 
         /// <summary>
         /// ui界面基类 子类名需要和UI预制件名称相同
         /// </summary>
-        public class UIBase : MonoBehaviour
+        public class UIBase : MonoBehaviour,ICycle
         {
             [HideInInspector]
             public CycleState m_State;
@@ -321,6 +345,16 @@ namespace FG_U_FW
             }
 
             public virtual void OnDestroy()
+            {
+                
+            }
+
+            public void OnFocus()
+            {
+                
+            }
+
+            public void OnUnFocus()
             {
                 
             }

@@ -2,7 +2,6 @@
 {
     public interface ISys
     {
-        void Init();
         void Clear();
     }
 }
