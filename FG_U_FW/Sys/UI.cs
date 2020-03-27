@@ -226,7 +226,7 @@ namespace FG_U_FW
 
         void focus(UIBase _ui)
         {
-            if(_ui.m_State == UICycleState.Focus || _ui.m_State == UICycleState.Show)
+            if(_ui.m_State == UICycleState.UnFocus || _ui.m_State == UICycleState.Show)
             {
                 _ui.m_State = UICycleState.Focus;
                 _ui.OnFocus();
