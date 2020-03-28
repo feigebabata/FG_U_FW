@@ -12,7 +12,7 @@ namespace FG_U_FW
         [RuntimeInitializeOnLoadMethod]
         static void onGameStart()
         {
-            Camera.main.gameObject.AddComponent<FGBBT>();
+            
         }
 
         ConcurrentDictionary<Type,ISys> m_sysTab = new ConcurrentDictionary<Type, ISys>();
