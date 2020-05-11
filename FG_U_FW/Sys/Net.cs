@@ -13,7 +13,7 @@ namespace FG_U_FW
     {
         public static class Config
         {
-            public const int BUFFER_MAX_SIZE=1024;
+            public const int BUFFER_MAX_SIZE=1024*16;
         }
 
         Hashtable m_clientTab = new Hashtable();
@@ -86,38 +86,83 @@ namespace FG_U_FW
             get{return Application.internetReachability==NetworkReachability.NotReachable;}
         }
 
+        public enum ClientState
+        {
+            None,
+            Connecting,
+            Connected,
+            Disconnected,
+            Closed, 
+        }
+
+        public enum SocketResult
+        {
+            Succ,
+            SendFail,
+            ReceiveFail,
+            ConnectFail,
+        }
+
+        public class NetMsgQueue : IEnumerator
+        {
+            Queue<object> m_msgQueue = new Queue<object>();
+            public object Current
+            {
+                get
+                {
+                    if(m_msgQueue.Count>0)
+                    {
+                        return m_msgQueue.Dequeue();
+                    }
+                    return null;
+                }
+            }
+
+            public bool MoveNext()
+            {
+                return m_msgQueue.Count==0;
+            }
+
+            public void Reset()
+            {
+                
+            }
+
+            public void Enqueue(object _msg)
+            {
+                m_msgQueue.Enqueue(_msg);
+            }
+        }
+
         public abstract class ClientBase
         {
             Socket m_client;
 
-            public byte[] m_Buffer = new byte[Net.Config.BUFFER_MAX_SIZE];
-            public int m_BufferSize;
+            protected byte[] m_buffer = new byte[Net.Config.BUFFER_MAX_SIZE];
+            protected int m_bufferSize;
 
-            IAsyncResult m_receiveAR;
+            protected NetMsgQueue m_receiveQueue = new NetMsgQueue();
+            protected object m_msgQueueLock = new object(); 
 
-            public ConcurrentQueue<object> m_ReceiveQueue = new ConcurrentQueue<object>();
+            public ClientState State;
 
-            public bool m_IsConnect
+
+            public virtual void Connect(string _ip,int _port)
             {
-                get
+                State=ClientState.None;
+                if(!Net.NoNetwork)
                 {
-                    if(m_client!=null && m_client.Connected)
-                    {
-                        return true;
-                    }
-                    return false;
+                    m_client = new Socket(Net.IP.AddressFamily,SocketType.Stream,ProtocolType.Tcp);
+
+                    State = ClientState.Connecting;
+                    m_client.BeginConnect(_ip,_port,new AsyncCallback(connectResult),m_client);
                 }
-            }
-
-
-            public void Connect(string _ip,int _port)
-            {
-                m_client?.Close();
-
-                m_client = new Socket(Net.IP.AddressFamily,SocketType.Stream,ProtocolType.Tcp);
-
-                IPAddress ip = IPAddress.Parse(_ip);
-                m_client.BeginConnect(_ip,_port,connectResult,m_client);
+                else
+                {
+                    ConnectResult(false);
+                    
+                    error(SocketResult.ConnectFail,"无网络");
+                }
             }
 
             void connectResult(IAsyncResult _ar)
@@ -126,11 +171,12 @@ namespace FG_U_FW
                 try
                 {
                     client.EndConnect(_ar);
+                    State = ClientState.Connected;
                 }
                 catch (System.Exception _e)
                 {
-                    OnError(_e.Message);
                     ConnectResult(false);
+                    error(SocketResult.ConnectFail,_e.Message);
                     return;
                 }
                 ConnectResult(true);
@@ -141,12 +187,15 @@ namespace FG_U_FW
 
             void receive()
             {
-                m_receiveAR = m_client.BeginReceive(m_Buffer,m_BufferSize,m_Buffer.Length-m_BufferSize,SocketFlags.None,receiveResult,m_client);
+                if(State==ClientState.Connected)
+                {
+                    m_client.BeginReceive(m_buffer,m_bufferSize,m_buffer.Length-m_bufferSize,SocketFlags.None,new AsyncCallback(receiveResult),m_client);
+                }
             }
 
             void receiveResult(IAsyncResult _ar)
             {
-                if(m_IsConnect)
+                if(m_client!=null && m_client.Connected)
                 {
                     Socket client = _ar.AsyncState as Socket;
                     int size=0;
@@ -156,23 +205,26 @@ namespace FG_U_FW
                     }
                     catch (System.Exception _e) 
                     {
-                        OnError(_e.Message);
+                        error(SocketResult.ReceiveFail,_e.Message);
                         return;
                     }
                     if(size>0)
                     {
-                        m_BufferSize+=size;
+                        m_bufferSize+=size;
                         Decode();
+                        receive();
                     }
-                    receive();
                 }
             }
 
             protected abstract void Decode();
 
-            public void Send(byte[] _data)
+            protected void Send(byte[] _data)
             {
-                m_client.BeginSend(_data,0,_data.Length,SocketFlags.None,sendResult,m_client);
+                if(State==ClientState.Connected)
+                {
+                    m_client.BeginSend(_data,0,_data.Length,SocketFlags.None,new AsyncCallback(sendResult),m_client);
+                }
             }
 
             void sendResult(IAsyncResult _ar)
@@ -184,22 +236,48 @@ namespace FG_U_FW
                 }
                 catch (System.Exception _e)
                 {
-                    OnError(_e.Message);
+                    error(SocketResult.SendFail,_e.Message);
                 }
             }
 
-            protected virtual void OnError(string _msg)
+            void error(SocketResult _result,string _msg)
             {
-                Close();
+                Debug.LogErrorFormat("[ClientBase.error] state = {2} , result = {0} , msg = {1}",_result,_msg,State);
+                if(State!=ClientState.Closed)
+                {
+                    OnError(_result,_msg);
+                }
+            }
+
+            protected virtual void OnError(SocketResult _result,string _msg)
+            {
+                State=ClientState.Disconnected;
+                disconnect();
             }
 
 
-            public void Close()
+            public virtual void Close()
             {
-                m_client?.Shutdown(SocketShutdown.Both);
-                m_client?.Close();
-                m_client=null;
-                m_BufferSize=0;
+                State=ClientState.Closed;
+                disconnect();
+            }
+
+            void disconnect()
+            {
+                if(m_client!=null)
+                {
+                    try
+                    {
+                        m_client.Shutdown(SocketShutdown.Both);
+                        m_client.Close();
+                    }
+                    catch(Exception _e)
+                    {
+                        
+                    }
+                    m_client=null;
+                }
+                m_bufferSize=0;
             }
         }
 
