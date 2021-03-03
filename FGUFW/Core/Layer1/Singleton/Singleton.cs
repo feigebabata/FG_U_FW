@@ -5,29 +5,29 @@ namespace FGUFW.Core
 {
 	public abstract class Singleton<T> where T : class, new()
 	{
-		private static T m_instance;
+		private static T _instance;
 		public static T I
 		{
 			get
 			{
-				if (Singleton<T>.m_instance == null)
+				if (Singleton<T>._instance == null)
 				{
-					Singleton<T>.m_instance = Activator.CreateInstance<T>();
-					if (Singleton<T>.m_instance != null)
+					Singleton<T>._instance = Activator.CreateInstance<T>();
+					if (Singleton<T>._instance != null)
 					{
-						(Singleton<T>.m_instance as Singleton<T>).Init();
+						(Singleton<T>._instance as Singleton<T>).Init();
 					}
 				}
 
-				return Singleton<T>.m_instance;
+				return Singleton<T>._instance;
 			}
 		}
 
 		public static void Release()
 		{
-			if (Singleton<T>.m_instance != null)
+			if (Singleton<T>._instance != null)
 			{
-				Singleton<T>.m_instance = (T)((object)null);
+				Singleton<T>._instance = (T)((object)null);
 			}
 		}
 
